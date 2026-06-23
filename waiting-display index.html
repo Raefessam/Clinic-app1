@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>شاشة العرض - العيادة الذكية</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Tahoma', Arial, sans-serif;
+    background: #0f172a;
+    color: white;
+    margin: 0;
+    padding: 30px;
+    min-height: 100vh;
+  }
+  .header { text-align: center; margin-bottom: 10px; }
+  .header h1 { color: #2dd4bf; font-size: 32px; margin: 0; }
+  .header select {
+    margin-top: 14px; padding: 8px 16px; font-size: 16px; border-radius: 8px;
+    border: none; background: #1e293b; color: white;
+  }
+  .clock { text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px; }
+
+  .now-serving {
+    background: linear-gradient(135deg, #0d9488, #0f766e);
+    border-radius: 20px; padding: 30px; text-align: center; margin-bottom: 30px;
+  }
+  .now-serving .label { font-size: 18px; color: #ccfbf1; margin-bottom: 8px; }
+  .now-serving .name { font-size: 56px; font-weight: bold; }
+
+  .queue-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+  .queue-item {
+    background: #1e293b; border-radius: 14px; padding: 20px; text-align: center;
+  }
+  .queue-item .pos { font-size: 14px; color: #94a3b8; }
+  .queue-item .name { font-size: 24px; font-weight: bold; margin-top: 6px; }
+
+  .empty-state { text-align: center; color: #64748b; font-size: 22px; margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏥 العيادة الذكية</h1>
+  <select id="locationSelect" onchange="loadQueue()"></select>
+</div>
+<div class="clock" id="clock"></div>
+
+<div id="content"></div>
+
+<script>
+  const SUPABASE_URL = 'https://xqdndbswvvbtszptheks.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxZG5kYnN3dnZidHN6cHRoZWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjEwNzUsImV4cCI6MjA5NzUzNzA3NX0.09dmmrv5YxMXJn6wuU0CtnrOJC1dWlbsPOwxVemqZcA';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleString('ar-EG', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  async function loadLocations() {
+    const { data } = await supabaseClient.from('locations').select('*');
+    const select = document.getElementById('locationSelect');
+    select.innerHTML = (data || []).map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    loadQueue();
+  }
+
+  function firstNameOnly(fullName) {
+    return fullName ? fullName.split(' ')[0] : 'مريض';
+  }
+
+  async function loadQueue() {
+    const locationId = document.getElementById('locationSelect').value;
+    const contentDiv = document.getElementById('content');
+    if (!locationId) return;
+
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .select('id, arrival_time, children(name)')
+      .eq('location_id', locationId)
+      .eq('status', 'confirmed')
+      .order('arrival_time', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      contentDiv.innerHTML = '<div class="empty-state">لا يوجد مرضى في الانتظار حاليًا 🌿</div>';
+      return;
+    }
+
+    const current = data[0];
+    const rest = data.slice(1);
+
+    let html = `
+      <div class="now-serving">
+        <div class="label">👈 الدور الآن</div>
+        <div class="name">${firstNameOnly(current.children ? current.children.name : '')}</div>
+      </div>`;
+
+    if (rest.length > 0) {
+      html += '<div class="queue-list">' + rest.map((b, i) => `
+        <div class="queue-item">
+          <div class="pos">الترتيب ${i + 2}</div>
+          <div class="name">${firstNameOnly(b.children ? b.children.name : '')}</div>
+        </div>
+      `).join('') + '</div>';
+    }
+
+    contentDiv.innerHTML = html;
+  }
+
+  loadLocations();
+  setInterval(loadQueue, 15000); // تحديث تلقائي كل 15 ثانية
+</script>
+
+</body>
+</html>

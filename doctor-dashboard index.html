@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الدكتورة - العيادة الذكية</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Tahoma', Arial, sans-serif;
+    background: #f0fdfa;
+    margin: 0;
+    padding: 20px 16px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .box {
+    background: white;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  }
+  h2 { color: #0f766e; margin: 0 0 4px 0; text-align: center; }
+  p.subtitle { text-align: center; color: #64748b; font-size: 13px; margin: 0 0 20px 0; }
+
+  .login-gate input { width: 100%; padding: 11px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; font-size: 14px; box-sizing: border-box; }
+  button.main {
+    width: 100%; padding: 12px; background: #0d9488; color: white;
+    border: none; border-radius: 8px; font-size: 15px; font-weight: bold;
+    cursor: pointer;
+  }
+  button.main:hover { background: #0f766e; }
+
+  .refresh-btn {
+    background: #f1f5f9; color: #0f766e; border: 1px solid #cbd5e1;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; margin-bottom: 14px;
+  }
+
+  .patient-card {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+  }
+  .patient-card:hover { border-color: #0d9488; }
+  .patient-top { display: table; width: 100%; }
+  .patient-top .left { display: table-cell; text-align: left; color: #64748b; font-size: 12px; }
+  .patient-top .right { display: table-cell; text-align: right; font-weight: bold; color: #0f172a; font-size: 15px; }
+  .patient-meta { font-size: 12.5px; color: #475569; margin-top: 4px; }
+  .no-patients { text-align: center; color: #94a3b8; padding: 30px 0; }
+
+  /* نموذج الكشف */
+  .record-form {
+    background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px;
+    padding: 14px; margin-top: 8px;
+  }
+  .record-form label { font-size: 13px; color: #334155; display: block; margin-bottom: 4px; margin-top: 10px; }
+  .record-form textarea {
+    width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 6px;
+    font-family: inherit; font-size: 13px; resize: vertical; min-height: 50px;
+  }
+  .finish-btn {
+    width: 100%; padding: 10px; background: #0f766e; color: white;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: bold;
+    cursor: pointer; margin-top: 12px;
+  }
+  .record-message { margin-top: 8px; font-size: 13px; text-align: center; }
+
+  .footer-brand { text-align: center; margin-top: 18px; font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="box">
+  <h2>لوحة الدكتورة</h2>
+  <p class="subtitle" id="subtitleText">سجّلي دخولك</p>
+
+  <div class="login-gate" id="loginGate">
+    <input type="email" id="gateEmail" placeholder="الإيميل">
+    <input type="password" id="gatePassword" placeholder="كلمة السر">
+    <button class="main" onclick="gateLogin()">تسجيل الدخول</button>
+    <div id="loginError" style="color:#b91c1c; font-size:13px; text-align:center; margin-top:6px; min-height:16px;"></div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button class="refresh-btn" onclick="showTab('patients')" id="tabPatients" style="flex:1; background:#0d9488; color:white; border:none;">👨‍⚕️ المرضى</button>
+      <button class="refresh-btn" onclick="showTab('schedule')" id="tabSchedule" style="flex:1;">📅 الجدول</button>
+      <button class="refresh-btn" onclick="showTab('settings')" id="tabSettings" style="flex:1;">⚙️ الإعدادات</button>
+    </div>
+
+    <div id="scheduleView" style="display:none;">
+
+      <div class="record-form" style="margin-top:0;">
+        <label style="margin-top:0;"><b>المواقع (العيادات)</b></label>
+        <div id="locationsList" style="margin:10px 0;"></div>
+        <input type="text" id="newLocName" placeholder="اسم العيادة الجديدة" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+        <input type="text" id="newLocAddress" placeholder="العنوان" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <button class="finish-btn" onclick="addLocation()">➕ إضافة موقع</button>
+        <div class="record-message" id="locMsg"></div>
+      </div>
+
+      <div class="record-form">
+        <label style="margin-top:0;"><b>الجدول الأسبوعي الثابت</b></label>
+        <div id="weeklyScheduleList" style="margin:10px 0;"></div>
+        <select id="newSchedLocation" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;"></select>
+        <select id="newSchedDay" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+          <option value="0">الأحد</option><option value="1">الإثنين</option><option value="2">الثلاثاء</option>
+          <option value="3">الأربعاء</option><option value="4">الخميس</option><option value="5">الجمعة</option><option value="6">السبت</option>
+        </select>
+        <div style="display:flex; gap:8px;">
+          <input type="time" id="newSchedStart" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          <input type="time" id="newSchedEnd" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        </div>
+        <button class="finish-btn" onclick="addWeeklySchedule()">➕ إضافة فترة عمل</button>
+        <div class="record-message" id="schedMsg"></div>
+      </div>
+
+      <div class="record-form">
+        <label style="margin-top:0;"><b>استثناء يومي</b> (إجازة، تغيير ساعات، أو حجز لشركة أدوية)</label>
+        <div id="exceptionsList" style="margin:10px 0;"></div>
+        <input type="date" id="excDate" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+        <select id="excLocation" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;"></select>
+        <select id="excType" onchange="toggleExcTimes()" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+          <option value="closed">إغلاق اليوم بالكامل</option>
+          <option value="modified_hours">تغيير ساعات العمل</option>
+          <option value="pharma_rep">حجز وقت لشركة أدوية</option>
+        </select>
+        <div id="excTimesRow" style="display:flex; gap:8px;">
+          <input type="time" id="excStart" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          <input type="time" id="excEnd" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        </div>
+        <button class="finish-btn" onclick="addException()">➕ إضافة استثناء</button>
+        <div class="record-message" id="excMsg"></div>
+      </div>
+
+    </div>
+
+    <div id="patientsView">
+      <button class="refresh-btn" onclick="loadPatients()">🔄 تحديث القائمة</button>
+      <div id="patientsList"></div>
+    </div>
+
+    <div id="settingsView" style="display:none;">
+      <div class="record-form" style="margin-top:0;">
+        <label>سعر الكشف الكامل (جنيه)</label>
+        <input type="number" id="set_exam_price" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <label>قيمة عربون الكشف/الاستشارة الحضورية (جنيه)</label>
+        <input type="number" id="set_exam_deposit" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <label>سعر الاستشارة الحضورية (جنيه)</label>
+        <input type="number" id="set_in_person_consultation_price" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <label>سعر الاستشارة عن بُعد (جنيه)</label>
+        <input type="number" id="set_consultation_price" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <label>متوسط مدة الكشف (دقيقة)</label>
+        <input type="number" id="set_avg_minutes" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+        <button class="finish-btn" onclick="saveSettings()">💾 حفظ الأسعار</button>
+        <div class="record-message" id="settingsMsg"></div>
+      </div>
+
+      <div class="record-form" style="margin-top:14px;">
+        <label style="margin-top:0;"><b>قائمة الخدمات الإضافية</b> (تطعيمات، حقن، إجراءات)</label>
+        <div id="servicesList" style="margin:10px 0;"></div>
+        <input type="text" id="newServiceName" placeholder="اسم الخدمة" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+        <input type="number" id="newServicePrice" placeholder="السعر (جنيه)" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:6px;">
+        <select id="newServiceType" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          <option value="vaccine">تطعيم</option>
+          <option value="injection">حقنة</option>
+          <option value="procedure">إجراء صغير</option>
+          <option value="other">أخرى</option>
+        </select>
+        <button class="finish-btn" onclick="addService()">➕ إضافة خدمة</button>
+        <div class="record-message" id="serviceMsg"></div>
+      </div>
+
+      <div class="record-form" style="margin-top:14px;">
+        <label style="margin-top:0;"><b>📋 سجل التعديلات على الملفات الطبية</b> (آخر 15 عملية)</label>
+        <div id="auditLogList" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-brand">تم الإعداد بواسطة شركة Infinite Systems</div>
+</div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://xqdndbswvvbtszptheks.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxZG5kYnN3dnZidHN6cHRoZWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjEwNzUsImV4cCI6MjA5NzUzNzA3NX0.09dmmrv5YxMXJn6wuU0CtnrOJC1dWlbsPOwxVemqZcA';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  function showTab(tab) {
+    document.getElementById('patientsView').style.display = tab === 'patients' ? 'block' : 'none';
+    document.getElementById('scheduleView').style.display = tab === 'schedule' ? 'block' : 'none';
+    document.getElementById('settingsView').style.display = tab === 'settings' ? 'block' : 'none';
+    ['tabPatients','tabSchedule','tabSettings'].forEach(id => {
+      const isActive = (id === 'tabPatients' && tab === 'patients') || (id === 'tabSchedule' && tab === 'schedule') || (id === 'tabSettings' && tab === 'settings');
+      document.getElementById(id).style.background = isActive ? '#0d9488' : '#f1f5f9';
+      document.getElementById(id).style.color = isActive ? 'white' : '#0f766e';
+    });
+    if (tab === 'settings') { loadSettings(); loadServices(); loadAuditLog(); }
+    if (tab === 'schedule') { loadLocations(); loadWeeklySchedule(); loadExceptions(); }
+  }
+
+  const dayNames = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const excTypeLabels = { closed: 'إغلاق كامل', modified_hours: 'تغيير ساعات', pharma_rep: 'شركة أدوية' };
+
+  function toggleExcTimes() {
+    const type = document.getElementById('excType').value;
+    document.getElementById('excTimesRow').style.display = (type === 'closed') ? 'none' : 'flex';
+  }
+
+  async function populateLocationDropdowns() {
+    const { data } = await supabaseClient.from('locations').select('*').order('name');
+    const options = (data || []).map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    document.getElementById('newSchedLocation').innerHTML = options;
+    document.getElementById('excLocation').innerHTML = '<option value="">كل المواقع</option>' + options;
+    return data || [];
+  }
+
+  async function loadLocations() {
+    const data = await populateLocationDropdowns();
+    const listDiv = document.getElementById('locationsList');
+    if (!data || data.length === 0) {
+      listDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">لسه مفيش مواقع مضافة.</p>';
+      return;
+    }
+    listDiv.innerHTML = data.map(l => `
+      <div style="padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
+        <b>${l.name}</b> ${l.address ? '— ' + l.address : ''}
+      </div>
+    `).join('');
+  }
+
+  async function addLocation() {
+    const name = document.getElementById('newLocName').value.trim();
+    const address = document.getElementById('newLocAddress').value.trim();
+    const msgDiv = document.getElementById('locMsg');
+    if (!name) { msgDiv.textContent = 'اكتب اسم العيادة'; msgDiv.style.color = '#b91c1c'; return; }
+
+    const { error } = await supabaseClient.from('locations').insert({ name, address: address || null });
+    if (error) { msgDiv.textContent = '❌ ' + error.message; msgDiv.style.color = '#b91c1c'; return; }
+
+    msgDiv.textContent = '✅ تمت الإضافة!';
+    msgDiv.style.color = '#15803d';
+    document.getElementById('newLocName').value = '';
+    document.getElementById('newLocAddress').value = '';
+    loadLocations();
+  }
+
+  async function loadWeeklySchedule() {
+    const { data, error } = await supabaseClient
+      .from('weekly_schedule')
+      .select('*, locations(name)')
+      .order('day_of_week');
+    const listDiv = document.getElementById('weeklyScheduleList');
+    if (error || !data || data.length === 0) {
+      listDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">لسه مفيش جدول مضاف.</p>';
+      return;
+    }
+    listDiv.innerHTML = data.map(s => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
+        <span>${dayNames[s.day_of_week]} — ${s.locations ? s.locations.name : '—'} (${s.start_time}–${s.end_time})</span>
+        <span style="cursor:pointer; color:#b91c1c;" onclick="deleteSchedRow('${s.id}')">حذف</span>
+      </div>
+    `).join('');
+  }
+
+  async function deleteSchedRow(id) {
+    await supabaseClient.from('weekly_schedule').delete().eq('id', id);
+    loadWeeklySchedule();
+  }
+
+  async function addWeeklySchedule() {
+    const locationId = document.getElementById('newSchedLocation').value;
+    const day = parseInt(document.getElementById('newSchedDay').value);
+    const start = document.getElementById('newSchedStart').value;
+    const end = document.getElementById('newSchedEnd').value;
+    const msgDiv = document.getElementById('schedMsg');
+
+    if (!locationId || !start || !end) { msgDiv.textContent = 'اكمل كل الحقول'; msgDiv.style.color = '#b91c1c'; return; }
+
+    const { error } = await supabaseClient.from('weekly_schedule').insert({
+      location_id: locationId, day_of_week: day, start_time: start, end_time: end
+    });
+    if (error) { msgDiv.textContent = '❌ ' + error.message; msgDiv.style.color = '#b91c1c'; return; }
+
+    msgDiv.textContent = '✅ تمت الإضافة!';
+    msgDiv.style.color = '#15803d';
+    document.getElementById('newSchedStart').value = '';
+    document.getElementById('newSchedEnd').value = '';
+    loadWeeklySchedule();
+  }
+
+  async function loadExceptions() {
+    const { data, error } = await supabaseClient
+      .from('schedule_exceptions')
+      .select('*, locations(name)')
+      .gte('exception_date', new Date().toISOString().split('T')[0])
+      .order('exception_date');
+    const listDiv = document.getElementById('exceptionsList');
+    if (error || !data || data.length === 0) {
+      listDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">لا يوجد استثناءات قادمة.</p>';
+      return;
+    }
+    listDiv.innerHTML = data.map(e => `
+      <div style="padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
+        <b>${e.exception_date}</b> — ${excTypeLabels[e.exception_type] || e.exception_type}
+        ${e.locations ? '(' + e.locations.name + ')' : '(كل المواقع)'}
+        ${e.start_time ? ' — ' + e.start_time + '–' + e.end_time : ''}
+        ${e.affects_existing_bookings ? '<span style="color:#0d9488;"> ✓ تم إشعار المرضى المتأثرين</span>' : ''}
+      </div>
+    `).join('');
+  }
+
+  async function addException() {
+    const date = document.getElementById('excDate').value;
+    const locationId = document.getElementById('excLocation').value || null;
+    const type = document.getElementById('excType').value;
+    const start = document.getElementById('excStart').value || null;
+    const end = document.getElementById('excEnd').value || null;
+    const msgDiv = document.getElementById('excMsg');
+
+    if (!date) { msgDiv.textContent = 'اختار التاريخ'; msgDiv.style.color = '#b91c1c'; return; }
+
+    msgDiv.textContent = 'بنحفظ... ⏳';
+    msgDiv.style.color = '#475569';
+
+    // 1. نبحث عن أي حجوزات قائمة في نفس اليوم (والموقع لو محدد) هتتأثر
+    let bookingsQuery = supabaseClient
+      .from('bookings')
+      .select('id, child_id, location_id, status, children(guardian_id)')
+      .gte('scheduled_at', date + 'T00:00:00')
+      .lte('scheduled_at', date + 'T23:59:59');
+    if (locationId) bookingsQuery = bookingsQuery.eq('location_id', locationId);
+
+    const { data: bookingsThatDay } = await bookingsQuery;
+    const affectedBookings = (bookingsThatDay || []).filter(b => b.status !== 'cancelled' && b.status !== 'completed');
+    const hasAffected = affectedBookings.length > 0;
+
+    // 2. حفظ الاستثناء نفسه
+    const { error } = await supabaseClient.from('schedule_exceptions').insert({
+      exception_date: date,
+      location_id: locationId,
+      exception_type: type,
+      start_time: start,
+      end_time: end,
+      affects_existing_bookings: hasAffected
+    });
+    if (error) { msgDiv.textContent = '❌ ' + error.message; msgDiv.style.color = '#b91c1c'; return; }
+
+    // 3. إشعار كل ولي أمر متأثر
+    if (hasAffected) {
+      const typeMsg = type === 'closed' ? 'تم إغلاق العيادة هذا اليوم' : (type === 'modified_hours' ? 'تم تغيير ساعات العمل هذا اليوم' : 'حدث تغيير في جدول هذا اليوم');
+      const notifications = affectedBookings
+        .filter(b => b.children && b.children.guardian_id)
+        .map(b => ({
+          guardian_id: b.children.guardian_id,
+          type: 'schedule_change',
+          message: typeMsg + '، تاريخ ' + date + '. برجاء التواصل مع العيادة لمعرفة التفاصيل.'
+        }));
+      if (notifications.length > 0) {
+        await supabaseClient.from('notifications').insert(notifications);
+      }
+    }
+
+    msgDiv.textContent = hasAffected
+      ? '✅ تم الحفظ، وتم إشعار ' + affectedBookings.length + ' حجز متأثر!'
+      : '✅ تم الحفظ (لا يوجد حجوزات متأثرة).';
+    msgDiv.style.color = '#15803d';
+    loadExceptions();
+  }
+
+  async function loadSettings() {
+    const { data } = await supabaseClient.from('settings').select('*');
+    const map = {};
+    (data || []).forEach(r => map[r.key] = r.value);
+    document.getElementById('set_exam_price').value = map['exam_price'] || '';
+    document.getElementById('set_exam_deposit').value = map['exam_deposit'] || '';
+    document.getElementById('set_in_person_consultation_price').value = map['in_person_consultation_price'] || '';
+    document.getElementById('set_consultation_price').value = map['consultation_price'] || '';
+    document.getElementById('set_avg_minutes').value = map['avg_consultation_minutes'] || '';
+  }
+
+  async function saveSettings() {
+    const msgDiv = document.getElementById('settingsMsg');
+    msgDiv.textContent = 'بنحفظ... ⏳';
+    msgDiv.style.color = '#475569';
+
+    const updates = [
+      { key: 'exam_price', value: document.getElementById('set_exam_price').value },
+      { key: 'exam_deposit', value: document.getElementById('set_exam_deposit').value },
+      { key: 'in_person_consultation_price', value: document.getElementById('set_in_person_consultation_price').value },
+      { key: 'consultation_price', value: document.getElementById('set_consultation_price').value },
+      { key: 'avg_consultation_minutes', value: document.getElementById('set_avg_minutes').value }
+    ];
+
+    for (const u of updates) {
+      const { error } = await supabaseClient.from('settings').upsert(u);
+      if (error) {
+        msgDiv.textContent = '❌ ' + error.message;
+        msgDiv.style.color = '#b91c1c';
+        return;
+      }
+    }
+    msgDiv.textContent = '✅ تم حفظ الأسعار بنجاح!';
+    msgDiv.style.color = '#15803d';
+  }
+
+  const serviceTypeLabels = { vaccine: 'تطعيم', injection: 'حقنة', procedure: 'إجراء صغير', other: 'أخرى' };
+
+  async function loadAuditLog() {
+    const listDiv = document.getElementById('auditLogList');
+    const { data, error } = await supabaseClient
+      .from('audit_log')
+      .select('*, medical_records(child_id, children(name))')
+      .order('changed_at', { ascending: false })
+      .limit(15);
+
+    if (error) {
+      listDiv.innerHTML = '<p style="color:#b91c1c; font-size:13px;">❌ ' + error.message + '</p>';
+      return;
+    }
+    if (!data || data.length === 0) {
+      listDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">لا يوجد سجلات بعد.</p>';
+      return;
+    }
+    listDiv.innerHTML = data.map(a => {
+      const childName = (a.medical_records && a.medical_records.children) ? a.medical_records.children.name : 'غير معروف';
+      const when = a.changed_at ? new Date(a.changed_at).toLocaleString('ar-EG') : '';
+      return `<div style="font-size:12.5px; padding:6px 0; border-bottom:1px solid #e2e8f0;">
+        <b>${childName}</b> — ${a.change_description}<br>
+        <span style="color:#94a3b8;">${when}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadServices() {
+    const { data, error } = await supabaseClient.from('services_catalog').select('*').order('name');
+    const listDiv = document.getElementById('servicesList');
+    if (error || !data || data.length === 0) {
+      listDiv.innerHTML = '<p style="color:#94a3b8; font-size:13px;">لسه مفيش خدمات مضافة.</p>';
+      return;
+    }
+    listDiv.innerHTML = data.map(s => `
+      <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:13px;">
+        <span>${s.name} <span style="color:#94a3b8;">(${serviceTypeLabels[s.service_type] || s.service_type})</span></span>
+        <span><b>${s.price} ج</b></span>
+      </div>
+    `).join('');
+  }
+
+  async function addService() {
+    const name = document.getElementById('newServiceName').value.trim();
+    const price = document.getElementById('newServicePrice').value;
+    const type = document.getElementById('newServiceType').value;
+    const msgDiv = document.getElementById('serviceMsg');
+
+    if (!name || !price) {
+      msgDiv.textContent = 'اكتب اسم الخدمة والسعر';
+      msgDiv.style.color = '#b91c1c';
+      return;
+    }
+
+    const { error } = await supabaseClient.from('services_catalog').insert({
+      name: name, price: parseFloat(price), service_type: type
+    });
+
+    if (error) {
+      msgDiv.textContent = '❌ ' + error.message;
+      msgDiv.style.color = '#b91c1c';
+      return;
+    }
+
+    msgDiv.textContent = '✅ تمت الإضافة!';
+    msgDiv.style.color = '#15803d';
+    document.getElementById('newServiceName').value = '';
+    document.getElementById('newServicePrice').value = '';
+    loadServices();
+  }
+
+  let currentUser = null;
+
+  async function gateLogin() {
+    const email = document.getElementById('gateEmail').value.trim();
+    const password = document.getElementById('gatePassword').value;
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      document.getElementById('loginError').textContent = '❌ فشل تسجيل الدخول: ' + error.message;
+      return;
+    }
+    currentUser = data.user;
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('subtitleText').textContent = 'مسجّلة دخول كـ ' + data.user.email;
+    loadPatients();
+  }
+
+  async function loadPatients() {
+    const listDiv = document.getElementById('patientsList');
+    listDiv.innerHTML = '<p style="text-align:center; color:#94a3b8;">جاري التحميل...</p>';
+
+    // المرضى الجاهزين للكشف: تم تأكيد وصولهم ودفعهم (confirmed)، ولسه الزيارة مكملتش
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .select('*, children(id, name, birth_date, allergies, chronic_conditions)')
+      .eq('status', 'confirmed')
+      .order('arrival_time', { ascending: true });
+
+    if (error) {
+      listDiv.innerHTML = '<p style="color:#b91c1c;">❌ ' + error.message + '</p>';
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      listDiv.innerHTML = '<div class="no-patients">لا يوجد مرضى في الانتظار حاليًا</div>';
+      return;
+    }
+
+    listDiv.innerHTML = data.map(b => {
+      const childName = b.children ? b.children.name : 'غير معروف';
+      const visitTypeLabel = b.visit_type === 'exam' ? 'كشف حضوري' : (b.visit_type === 'in_person_consultation' ? 'استشارة حضورية' : 'استشارة عن بُعد');
+      const allergies = (b.children && b.children.allergies) ? '⚠️ حساسية: ' + b.children.allergies : '';
+      return `
+        <div class="patient-card" id="card-${b.id}">
+          <div onclick="toggleRecordForm('${b.id}', '${b.child_id}')">
+            <div class="patient-top">
+              <span class="left">${visitTypeLabel}</span>
+              <span class="right">${childName}</span>
+            </div>
+            <div class="patient-meta">${allergies}</div>
+          </div>
+          <div id="form-${b.id}" style="display:none;"></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function toggleRecordForm(bookingId, childId) {
+    const formDiv = document.getElementById('form-' + bookingId);
+    if (formDiv.innerHTML !== '') {
+      formDiv.style.display = formDiv.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
+    formDiv.innerHTML = `
+      <div class="record-form">
+        <label>التشخيص</label>
+        <textarea id="diag-${bookingId}"></textarea>
+        <label>الروشتة</label>
+        <textarea id="presc-${bookingId}"></textarea>
+        <label>ملاحظات</label>
+        <textarea id="notes-${bookingId}"></textarea>
+        <button class="finish-btn" onclick="finishVisit('${bookingId}', '${childId}')">✅ حفظ وإنهاء الزيارة</button>
+        <div class="record-message" id="msg-${bookingId}"></div>
+      </div>
+    `;
+    formDiv.style.display = 'block';
+  }
+
+  async function finishVisit(bookingId, childId) {
+    const diagnosis = document.getElementById('diag-' + bookingId).value.trim();
+    const prescription = document.getElementById('presc-' + bookingId).value.trim();
+    const notes = document.getElementById('notes-' + bookingId).value.trim();
+    const msgDiv = document.getElementById('msg-' + bookingId);
+
+    msgDiv.textContent = 'بنحفظ... ⏳';
+    msgDiv.style.color = '#475569';
+
+    // 1. حفظ السجل الطبي
+    const { data: recData, error: recError } = await supabaseClient.from('medical_records').insert({
+      booking_id: bookingId,
+      child_id: childId,
+      diagnosis: diagnosis,
+      prescription: prescription,
+      notes: notes
+    }).select().single();
+
+    if (recError) {
+      msgDiv.textContent = '❌ ' + recError.message;
+      msgDiv.style.color = '#b91c1c';
+      return;
+    }
+
+    // 1ب. تسجيل العملية في سجل التعديلات (Audit Log)
+    await supabaseClient.from('audit_log').insert({
+      medical_record_id: recData.id,
+      changed_by: currentUser ? currentUser.id : null,
+      change_description: 'إنشاء سجل طبي جديد (تشخيص وروشتة) لهذه الزيارة'
+    });
+
+    // 2. إنهاء الزيارة (تحديث حالة الحجز)
+    const { error: updError } = await supabaseClient
+      .from('bookings')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', bookingId);
+
+    if (updError) {
+      msgDiv.textContent = '⚠️ تم حفظ السجل لكن فيه مشكلة في إنهاء الزيارة: ' + updError.message;
+      msgDiv.style.color = '#b91c1c';
+      return;
+    }
+
+    msgDiv.textContent = '✅ تم حفظ الكشف وإنهاء الزيارة بنجاح!';
+    msgDiv.style.color = '#15803d';
+    setTimeout(loadPatients, 1200);
+  }
+</script>
+
+</body>
+</html>
