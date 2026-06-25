@@ -612,6 +612,36 @@
       return;
     }
 
+    // 3. إشعار ولي الأمر بانتهاء الزيارة
+    const { data: childInfo } = await supabaseClient.from('children').select('guardian_id, name').eq('id', childId).single();
+    if (childInfo && childInfo.guardian_id) {
+      const prescSummary = prescription ? (' الروشتة: ' + prescription) : '';
+      await supabaseClient.from('notifications').insert({
+        guardian_id: childInfo.guardian_id,
+        type: 'visit_completed',
+        message: `انتهت زيارة ${childInfo.name} بنجاح.${prescSummary} يمكنك مراجعة التفاصيل الكاملة من ملف الطفل.`
+      });
+    }
+
+    // 4. إشعار "جاء دورك الآن" للمريض التالي في الدور بنفس الموقع
+    const { data: justCompletedBooking } = await supabaseClient.from('bookings').select('location_id').eq('id', bookingId).single();
+    if (justCompletedBooking) {
+      const { data: nextInQueue } = await supabaseClient
+        .from('bookings')
+        .select('id, children(guardian_id, name)')
+        .eq('location_id', justCompletedBooking.location_id)
+        .eq('status', 'confirmed')
+        .order('arrival_time', { ascending: true })
+        .limit(1);
+      if (nextInQueue && nextInQueue.length > 0 && nextInQueue[0].children && nextInQueue[0].children.guardian_id) {
+        await supabaseClient.from('notifications').insert({
+          guardian_id: nextInQueue[0].children.guardian_id,
+          type: 'your_turn',
+          message: `🎉 جاء دورك الآن يا ولي أمر ${nextInQueue[0].children.name}، من فضلك توجّه للدكتورة.`
+        });
+      }
+    }
+
     msgDiv.textContent = '✅ تم حفظ الكشف وإنهاء الزيارة بنجاح!';
     msgDiv.style.color = '#15803d';
     setTimeout(loadPatients, 1200);

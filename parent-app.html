@@ -67,12 +67,16 @@
   .slot-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
   .slot-btn { padding: 10px 4px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; cursor: pointer; font-size: 13px; text-align: center; }
   .slot-btn.selected { background: #0d9488; color: white; border-color: #0d9488; font-weight: bold; }
+  .slot-btn.booked { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
   .no-slots { color: #94a3b8; font-size: 13px; text-align: center; padding: 10px 0; }
   .price-box { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 10px 14px; margin-top: 14px; font-size: 13px; color: #0f766e; }
 
   .queue-card { border-radius: 12px; padding: 18px; margin-bottom: 12px; text-align: center; }
   .queue-card.waiting { background: #f0fdfa; border: 1px solid #99f6e4; }
   .queue-card.notyet { background: #f8fafc; border: 1px solid #e2e8f0; }
+  .queue-card.urgency-green { background: #f0fdf4; border: 1px solid #86efac; }
+  .queue-card.urgency-yellow { background: #fffbeb; border: 1px solid #fcd34d; }
+  .queue-card.urgency-red { background: #fef2f2; border: 1px solid #fca5a5; }
   .queue-card .child-name { font-weight: bold; font-size: 15px; color: #0f172a; margin-bottom: 6px; }
   .queue-position { font-size: 36px; font-weight: bold; color: #0d9488; margin: 4px 0; }
   .queue-position .small { font-size: 13px; color: #64748b; font-weight: normal; }
@@ -168,6 +172,11 @@
       <label>اختر التاريخ</label>
       <input type="date" id="dateSelect" onchange="loadSlots()">
       <label>المواعيد المتاحة</label>
+      <div style="font-size:11px; color:#64748b; margin-bottom:6px;">
+        <span style="display:inline-block; width:10px; height:10px; background:white; border:1px solid #cbd5e1; border-radius:3px; margin-left:4px;"></span> متاح
+        &nbsp;&nbsp;
+        <span style="display:inline-block; width:10px; height:10px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:3px; margin-left:4px;"></span> محجوز
+      </div>
       <div class="slot-grid" id="slotGrid"><div class="no-slots">اختر تاريخ الأول</div></div>
       <button class="main" onclick="confirmBooking()" id="bookBtn">تأكيد الحجز</button>
       <div id="bookingMessage" style="margin-top:8px; font-size:13px; text-align:center;"></div>
@@ -279,7 +288,7 @@
     document.getElementById('navBooking').classList.toggle('active', tab === 'booking');
     document.getElementById('navQueue').classList.toggle('active', tab === 'queue');
     document.getElementById('navNotif').classList.toggle('active', tab === 'notif');
-    if (tab === 'queue') loadQueueStatus();
+    if (tab === 'queue') { loadQueueStatus(); startQueueAutoRefresh(); } else { stopQueueAutoRefresh(); }
     if (tab === 'notif') loadNotifications();
     if (tab === 'booking') loadChildrenIntoBookingSelect();
   }
@@ -411,7 +420,28 @@
       return;
     }
 
-    grid.innerHTML = slots.map(s => `<div class="slot-btn" onclick="selectSlot('${s}', this)">${s}</div>`).join('');
+    // نجيب الحجوزات الموجودة فعليًا في نفس اليوم والموقع، عشان نلوّن المواعيد المحجوزة
+    const dayStart = new Date(dateStr + 'T00:00:00');
+    const dayEnd = new Date(dateStr + 'T23:59:59.999');
+    const { data: existingBookings } = await supabaseClient
+      .from('bookings')
+      .select('scheduled_at, status')
+      .eq('location_id', locationId)
+      .gte('scheduled_at', dayStart.toISOString())
+      .lte('scheduled_at', dayEnd.toISOString())
+      .neq('status', 'cancelled');
+
+    const bookedTimes = new Set((existingBookings || []).map(b => {
+      const d = new Date(b.scheduled_at);
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }));
+
+    grid.innerHTML = slots.map(s => {
+      if (bookedTimes.has(s)) {
+        return `<div class="slot-btn booked" title="هذا الموعد محجوز">${s}<br><span style="font-size:10px;">محجوز</span></div>`;
+      }
+      return `<div class="slot-btn" onclick="selectSlot('${s}', this)">${s}</div>`;
+    }).join('');
     selectedSlot = null;
   }
 
@@ -450,6 +480,16 @@
       }
       messageDiv.className = 'err'; btn.disabled = false; return;
     }
+
+    // إشعار تأكيد إنشاء الحجز
+    const childLabel = document.getElementById('childSelect').selectedOptions[0]?.textContent || '';
+    const locLabel = document.getElementById('locationSelect').selectedOptions[0]?.textContent || '';
+    const dateLabel = scheduledAt.toLocaleDateString('ar-EG', {weekday:'long', day:'numeric', month:'numeric'});
+    await supabaseClient.from('notifications').insert({
+      guardian_id: currentUser.id,
+      type: 'booking_created',
+      message: `تم تأكيد حجز ${childLabel} يوم ${dateLabel} الساعة ${selectedSlot} في ${locLabel}.`
+    });
 
     messageDiv.textContent = '✅ تم تسجيل الحجز! تابع حالته من تاب "🔔 الدور"';
     messageDiv.className = 'ok'; btn.disabled = false;
@@ -508,15 +548,30 @@
       const { data: aheadCount, error: rpcError } = await supabaseClient.rpc('get_queue_position', { p_booking_id: b.id });
       const safeAheadCount = rpcError ? 0 : (aheadCount || 0);
       const waitMinutes = safeAheadCount * avgMinutes;
+      const estimatedTime = new Date(Date.now() + waitMinutes * 60000).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+
+      let urgencyClass = 'urgency-green';
+      if (waitMinutes <= 10) urgencyClass = 'urgency-red';
+      else if (waitMinutes <= 30) urgencyClass = 'urgency-yellow';
+
       if (safeAheadCount === 0) {
-        html += `<div class="queue-card waiting"><div class="child-name">${childName}</div><div class="your-turn">🎉 الدور عليك دلوقتي!</div></div>`;
+        html += `<div class="queue-card waiting urgency-red"><div class="child-name">${childName}</div><div class="your-turn">🎉 الدور عليك دلوقتي!</div></div>`;
       } else {
-        html += `<div class="queue-card waiting"><div class="child-name">${childName}</div>
+        html += `<div class="queue-card waiting ${urgencyClass}"><div class="child-name">${childName}</div>
           <div class="queue-position">${safeAheadCount} <span class="small">مريض قبلك</span></div>
-          <div class="wait-estimate">⏱️ الوقت التقريبي: حوالي ${waitMinutes} دقيقة</div></div>`;
+          <div class="wait-estimate">⏱️ الوقت التقريبي: حوالي ${waitMinutes} دقيقة (حوالي الساعة ${estimatedTime})</div></div>`;
       }
     }
     listDiv.innerHTML = html;
+  }
+
+  let queueAutoRefreshInterval = null;
+  function startQueueAutoRefresh() {
+    stopQueueAutoRefresh();
+    queueAutoRefreshInterval = setInterval(loadQueueStatus, 30000);
+  }
+  function stopQueueAutoRefresh() {
+    if (queueAutoRefreshInterval) { clearInterval(queueAutoRefreshInterval); queueAutoRefreshInterval = null; }
   }
 </script>
 
