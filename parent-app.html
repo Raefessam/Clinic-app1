@@ -130,6 +130,7 @@
       <button class="nav-tab active" id="navChildren" onclick="switchMainTab('children')">👶 أطفالي</button>
       <button class="nav-tab" id="navBooking" onclick="switchMainTab('booking')">📅 حجز</button>
       <button class="nav-tab" id="navQueue" onclick="switchMainTab('queue')">🔔 الدور</button>
+      <button class="nav-tab" id="navNotif" onclick="switchMainTab('notif')">📩 الإشعارات</button>
     </div>
 
     <!-- تاب: أطفالي -->
@@ -176,6 +177,12 @@
     <div id="viewQueue" style="display:none;">
       <button class="refresh-btn" onclick="loadQueueStatus()">🔄 تحديث</button>
       <div id="queueList"></div>
+    </div>
+
+    <!-- تاب: الإشعارات -->
+    <div id="viewNotif" style="display:none;">
+      <button class="refresh-btn" onclick="loadNotifications()">🔄 تحديث</button>
+      <div id="notifList"></div>
     </div>
   </div>
 
@@ -267,10 +274,13 @@
     document.getElementById('viewChildren').style.display = tab === 'children' ? 'block' : 'none';
     document.getElementById('viewBooking').style.display = tab === 'booking' ? 'block' : 'none';
     document.getElementById('viewQueue').style.display = tab === 'queue' ? 'block' : 'none';
+    document.getElementById('viewNotif').style.display = tab === 'notif' ? 'block' : 'none';
     document.getElementById('navChildren').classList.toggle('active', tab === 'children');
     document.getElementById('navBooking').classList.toggle('active', tab === 'booking');
     document.getElementById('navQueue').classList.toggle('active', tab === 'queue');
+    document.getElementById('navNotif').classList.toggle('active', tab === 'notif');
     if (tab === 'queue') loadQueueStatus();
+    if (tab === 'notif') loadNotifications();
     if (tab === 'booking') loadChildrenIntoBookingSelect();
   }
 
@@ -446,6 +456,32 @@
   }
 
   /* ===== متابعة الدور ===== */
+  /* ===== الإشعارات ===== */
+  async function loadNotifications() {
+    const listDiv = document.getElementById('notifList');
+    listDiv.innerHTML = '<p style="text-align:center; color:#94a3b8;">جاري التحميل...</p>';
+
+    const { data, error } = await supabaseClient
+      .from('notifications')
+      .select('*')
+      .eq('guardian_id', currentUser.id)
+      .order('sent_at', { ascending: false });
+
+    if (error) { listDiv.innerHTML = '<p style="color:#b91c1c;">❌ ' + error.message + '</p>'; return; }
+    if (!data || data.length === 0) {
+      listDiv.innerHTML = '<div class="no-active">لا يوجد إشعارات حاليًا</div>';
+      return;
+    }
+
+    listDiv.innerHTML = data.map(n => {
+      const when = n.sent_at ? new Date(n.sent_at).toLocaleString('ar-EG') : '';
+      return `<div class="card" style="text-align:right;">
+        <div style="font-size:14px; color:#0f172a;">${n.message}</div>
+        <div style="font-size:11px; color:#94a3b8; margin-top:4px;">${when}</div>
+      </div>`;
+    }).join('');
+  }
+
   async function loadQueueStatus() {
     const listDiv = document.getElementById('queueList');
     listDiv.innerHTML = '<p style="text-align:center; color:#94a3b8;">جاري التحميل...</p>';
