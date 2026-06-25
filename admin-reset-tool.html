@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>أداة التنظيف - العيادة الذكية</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Tahoma', Arial, sans-serif;
+    background: #fff7ed;
+    margin: 0;
+    padding: 24px 16px;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  .box { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+  h2 { color: #b45309; margin: 0 0 4px 0; text-align: center; }
+  p.subtitle { text-align: center; color: #64748b; font-size: 13px; margin: 0 0 18px 0; }
+  .warning-banner { background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; font-size: 12.5px; color: #92400e; text-align: center; margin-bottom: 18px; }
+
+  .login-gate input { width: 100%; padding: 11px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; font-size: 14px; box-sizing: border-box; }
+  button.main { width: 100%; padding: 12px; background: #0d9488; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  #loginError { color:#b91c1c; font-size:13px; text-align:center; margin-top:6px; min-height:16px; }
+
+  .reset-card { border: 1px solid #fecaca; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .reset-card .title { font-weight: bold; color: #0f172a; font-size: 14px; margin-bottom: 4px; }
+  .reset-card .desc { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+  .confirm-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12.5px; }
+  .confirm-row input { width: auto; }
+  .delete-btn { width: 100%; padding: 10px; background: #dc2626; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; }
+  .delete-btn:disabled { background: #fca5a5; cursor: not-allowed; }
+  .result-msg { margin-top: 8px; font-size: 12.5px; text-align: center; }
+  .footer-brand { text-align: center; margin-top: 18px; font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="box">
+  <h2>🧹 أداة التنظيف</h2>
+  <p class="subtitle" id="subtitleText">للدكتورة فقط — استخدام داخلي للتجربة</p>
+
+  <div class="login-gate" id="loginGate">
+    <input type="email" id="gateEmail" placeholder="الإيميل">
+    <input type="password" id="gatePassword" placeholder="كلمة السر">
+    <button class="main" onclick="gateLogin()">تسجيل الدخول</button>
+    <div id="loginError"></div>
+  </div>
+
+  <div id="toolsSection" style="display:none;">
+    <div class="warning-banner">⚠️ كل عملية حذف هنا نهائية ومش بترجع، استخدمها بحذر</div>
+
+    <div class="reset-card">
+      <div class="title">مسح الحجوزات والمدفوعات والملفات الطبية</div>
+      <div class="desc">يمسح كل الحجوزات، المدفوعات، الملفات الطبية، والإشعارات — وبيسيب أولياء الأمور والأطفال والإعدادات والجدول كما هم.</div>
+      <div class="confirm-row"><input type="checkbox" id="c1"> <span>أنا متأكد إني عايز أمسح ده</span></div>
+      <button class="delete-btn" id="b1" disabled onclick="resetBookingsData()">حذف الحجوزات والمدفوعات</button>
+      <div class="result-msg" id="r1"></div>
+    </div>
+
+    <div class="reset-card">
+      <div class="title">مسح أولياء الأمور والأطفال (وكل حجوزاتهم تبعًا لذلك)</div>
+      <div class="desc">يمسح كل الحسابات وبيانات الأطفال، وبالتبعية كل حجوزاتهم ومدفوعاتهم وملفاتهم.</div>
+      <div class="confirm-row"><input type="checkbox" id="c2"> <span>أنا متأكد إني عايز أمسح ده</span></div>
+      <button class="delete-btn" id="b2" disabled onclick="resetGuardiansData()">حذف أولياء الأمور والأطفال</button>
+      <div class="result-msg" id="r2"></div>
+    </div>
+
+    <div class="reset-card">
+      <div class="title">مسح الاستثناءات اليومية فقط</div>
+      <div class="desc">يمسح كل استثناءات الجدول (إغلاق/تغيير ساعات/شركات أدوية)، بدون التأثير على الجدول الأسبوعي الثابت.</div>
+      <div class="confirm-row"><input type="checkbox" id="c3"> <span>أنا متأكد إني عايز أمسح ده</span></div>
+      <button class="delete-btn" id="b3" disabled onclick="resetExceptionsData()">حذف الاستثناءات</button>
+      <div class="result-msg" id="r3"></div>
+    </div>
+
+    <div class="reset-card" style="border-color:#7f1d1d;">
+      <div class="title">🔴 تصفير شامل (كل شيء إلا الإعدادات والجدول)</div>
+      <div class="desc">يمسح أولياء الأمور، الأطفال، الحجوزات، المدفوعات، الملفات الطبية، والإشعارات معًا — يبقي العيادات والجدول والأسعار وحسابات الدخول.</div>
+      <div class="confirm-row"><input type="checkbox" id="c4"> <span>أنا متأكد تمامًا، امسح كل شيء</span></div>
+      <button class="delete-btn" id="b4" disabled onclick="resetEverything()">🔴 تصفير شامل</button>
+      <div class="result-msg" id="r4"></div>
+    </div>
+  </div>
+
+  <div class="footer-brand">تم الإعداد بواسطة شركة Infinite Systems</div>
+</div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://xqdndbswvvbtszptheks.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxZG5kYnN3dnZidHN6cHRoZWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjEwNzUsImV4cCI6MjA5NzUzNzA3NX0.09dmmrv5YxMXJn6wuU0CtnrOJC1dWlbsPOwxVemqZcA';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  ['c1','c2','c3','c4'].forEach((id, i) => {
+    document.getElementById(id).addEventListener('change', function() {
+      document.getElementById('b' + (i+1)).disabled = !this.checked;
+    });
+  });
+
+  async function gateLogin() {
+    const email = document.getElementById('gateEmail').value.trim();
+    const password = document.getElementById('gatePassword').value;
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) { document.getElementById('loginError').textContent = '❌ ' + error.message; return; }
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('toolsSection').style.display = 'block';
+  }
+
+  async function resetBookingsData() {
+    const r = document.getElementById('r1');
+    r.textContent = 'بنمسح... ⏳'; r.style.color = '#475569';
+    const { error } = await supabaseClient.from('bookings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) { r.textContent = '❌ ' + error.message; r.style.color = '#b91c1c'; return; }
+    r.textContent = '✅ تم المسح بنجاح'; r.style.color = '#15803d';
+    document.getElementById('c1').checked = false; document.getElementById('b1').disabled = true;
+  }
+
+  async function resetGuardiansData() {
+    const r = document.getElementById('r2');
+    r.textContent = 'بنمسح... ⏳'; r.style.color = '#475569';
+    const { error } = await supabaseClient.from('guardians').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) { r.textContent = '❌ ' + error.message; r.style.color = '#b91c1c'; return; }
+    r.textContent = '✅ تم المسح بنجاح'; r.style.color = '#15803d';
+    document.getElementById('c2').checked = false; document.getElementById('b2').disabled = true;
+  }
+
+  async function resetExceptionsData() {
+    const r = document.getElementById('r3');
+    r.textContent = 'بنمسح... ⏳'; r.style.color = '#475569';
+    const { error } = await supabaseClient.from('schedule_exceptions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) { r.textContent = '❌ ' + error.message; r.style.color = '#b91c1c'; return; }
+    r.textContent = '✅ تم المسح بنجاح'; r.style.color = '#15803d';
+    document.getElementById('c3').checked = false; document.getElementById('b3').disabled = true;
+  }
+
+  async function resetEverything() {
+    const r = document.getElementById('r4');
+    r.textContent = 'بنمسح كل شيء... ⏳'; r.style.color = '#475569';
+    const { error: e1 } = await supabaseClient.from('bookings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    const { error: e2 } = await supabaseClient.from('guardians').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (e1 || e2) { r.textContent = '❌ ' + ((e1 && e1.message) || (e2 && e2.message)); r.style.color = '#b91c1c'; return; }
+    r.textContent = '✅ تم التصفير الشامل بنجاح'; r.style.color = '#15803d';
+    document.getElementById('c4').checked = false; document.getElementById('b4').disabled = true;
+  }
+</script>
+
+</body>
+</html>
