@@ -108,8 +108,14 @@
           <option value="3">الأربعاء</option><option value="4">الخميس</option><option value="5">الجمعة</option><option value="6">السبت</option>
         </select>
         <div style="display:flex; gap:8px;">
-          <input type="time" id="newSchedStart" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
-          <input type="time" id="newSchedEnd" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          <div style="flex:1;">
+            <label style="margin-top:0; font-size:11px;">من (بداية الدوام)</label>
+            <input type="time" id="newSchedStart" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          </div>
+          <div style="flex:1;">
+            <label style="margin-top:0; font-size:11px;">إلى (نهاية الدوام)</label>
+            <input type="time" id="newSchedEnd" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          </div>
         </div>
         <button class="finish-btn" onclick="addWeeklySchedule()">➕ إضافة فترة عمل</button>
         <div class="record-message" id="schedMsg"></div>
@@ -126,8 +132,14 @@
           <option value="pharma_rep">حجز وقت لشركة أدوية</option>
         </select>
         <div id="excTimesRow" style="display:flex; gap:8px;">
-          <input type="time" id="excStart" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
-          <input type="time" id="excEnd" style="flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          <div style="flex:1;">
+            <label style="margin-top:0; font-size:11px;">من</label>
+            <input type="time" id="excStart" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          </div>
+          <div style="flex:1;">
+            <label style="margin-top:0; font-size:11px;">إلى</label>
+            <input type="time" id="excEnd" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:6px;">
+          </div>
         </div>
         <button class="finish-btn" onclick="addException()">➕ إضافة استثناء</button>
         <div class="record-message" id="excMsg"></div>
@@ -277,6 +289,7 @@
     const msgDiv = document.getElementById('schedMsg');
 
     if (!locationId || !start || !end) { msgDiv.textContent = 'اكمل كل الحقول'; msgDiv.style.color = '#b91c1c'; return; }
+    if (start >= end) { msgDiv.textContent = '❌ وقت "من" لازم يكون قبل وقت "إلى" — تأكد من الترتيب'; msgDiv.style.color = '#b91c1c'; return; }
 
     const { error } = await supabaseClient.from('weekly_schedule').insert({
       location_id: locationId, day_of_week: day, start_time: start, end_time: end
@@ -320,6 +333,7 @@
     const msgDiv = document.getElementById('excMsg');
 
     if (!date) { msgDiv.textContent = 'اختار التاريخ'; msgDiv.style.color = '#b91c1c'; return; }
+    if (start && end && start >= end) { msgDiv.textContent = '❌ وقت "من" لازم يكون قبل وقت "إلى"'; msgDiv.style.color = '#b91c1c'; return; }
 
     msgDiv.textContent = 'بنحفظ... ⏳';
     msgDiv.style.color = '#475569';
