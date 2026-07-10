@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تطبيق العيادة | ولي الأمر</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--primary:#0e6e63;--primary-dark:#0a4f47;--accent:#e8a33d;--success:#22c55e;--danger:#c1483a;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;--gray-300:#d1d5db;--gray-500:#6b7280;--gray-700:#374151;--radius:12px;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Cairo',sans-serif;background:linear-gradient(135deg,#f0fdfb 0%,#f9fafb 100%);color:var(--gray-700);}
+.header{background:white;padding:20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+.header h1{margin:0;color:var(--primary);font-size:24px;}
+.container{max-width:1000px;margin:0 auto;padding:30px 20px;}
+.tabs-nav{display:flex;gap:10px;margin-bottom:30px;border-bottom:2px solid var(--gray-200);flex-wrap:wrap;}
+.tab-btn{padding:12px 20px;border:none;background:none;color:var(--gray-500);font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.3s;}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.card{background:white;border-radius:var(--radius);padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;}
+.card-header{font-size:18px;font-weight:700;color:var(--primary);margin-bottom:20px;padding-bottom:15px;border-bottom:2px solid var(--accent);}
+.doctor-btn{width:100%;padding:20px;background:white;border:2px solid var(--gray-200);border-radius:10px;cursor:pointer;transition:all 0.3s;text-align:right;margin-bottom:10px;}
+.doctor-btn:hover{border-color:var(--primary);box-shadow:0 4px 12px rgba(14,110,99,0.1);}
+.doctor-btn.selected{background:linear-gradient(135deg,rgba(14,110,99,0.1) 0%,rgba(14,110,99,0.05) 100%);border-color:var(--primary);}
+.doctor-name{font-weight:700;font-size:16px;color:var(--primary);}
+.doctor-spec{font-size:13px;color:var(--gray-500);margin-top:5px;}
+.date-input{width:100%;padding:15px;border:2px solid var(--gray-200);border-radius:10px;font-family:'Cairo',sans-serif;font-size:15px;cursor:pointer;transition:all 0.3s;}
+.date-input:hover,.date-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,110,99,0.1);}
+.step-label{font-weight:700;font-size:16px;color:var(--primary);margin-bottom:15px;display:flex;align-items:center;gap:10px;}
+.step-number{background:var(--primary);color:white;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.slots-container{margin-top:15px;}
+.cinema-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:12px;}
+.cinema-slot{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:2px solid var(--gray-300);border-radius:10px;cursor:pointer;transition:all 0.3s;font-weight:700;font-size:14px;background:white;}
+.cinema-slot.available{border-color:var(--success);background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%);color:var(--success);}
+.cinema-slot.available:hover{transform:scale(1.08);box-shadow:0 8px 16px rgba(34,197,94,0.3);}
+.cinema-slot.available.selected{background:var(--success);color:white;box-shadow:0 8px 20px rgba(34,197,94,0.4);transform:scale(1.1);}
+.cinema-slot.booked{border-color:var(--gray-300);background:var(--gray-100);color:var(--gray-400);cursor:not-allowed;opacity:0.5;}
+.summary-box{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);color:white;padding:25px;border-radius:12px;margin:30px 0;}
+.summary-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.1);}
+.summary-item:last-child{border-bottom:none;}
+.summary-value{font-weight:700;font-size:16px;}
+.price-box{background:var(--accent);color:white;padding:15px;border-radius:10px;text-align:center;margin-top:15px;font-weight:700;font-size:18px;}
+.btn{padding:15px 30px;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;transition:all 0.3s;width:100%;}
+.btn-primary{background:var(--primary);color:white;}
+.btn-primary:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 8px 20px rgba(14,110,99,0.3);}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+.modal.show{display:flex;}
+.modal-content{background:white;border-radius:var(--radius);padding:30px;max-width:500px;width:100%;}
+.modal-header{font-size:20px;font-weight:800;color:var(--primary);margin-bottom:20px;padding-bottom:15px;border-bottom:2px solid var(--accent);}
+.payment-info{background:var(--gray-50);padding:20px;border-radius:10px;margin:20px 0;}
+.payment-field{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--gray-200);}
+.form-group{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.form-group label{font-weight:600;color:var(--gray-700);font-size:14px;}
+.form-group input{padding:10px;border:1px solid var(--gray-300);border-radius:8px;font-family:'Cairo',sans-serif;font-size:14px;}
+.form-group input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,110,99,0.1);}
+.message{padding:15px;border-radius:8px;margin-bottom:15px;display:none;}
+.message.show{display:block;}
+.message.success{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;}
+.message.error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+@media(max-width:768px){.cinema-slots{grid-template-columns:repeat(auto-fill,minmax(70px,1fr));}table{font-size:12px;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏥 تطبيق العيادة</h1>
+  <button onclick="logout()" style="padding:10px 20px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">تسجيل خروج</button>
+</div>
+<div class="container">
+  <div id="successMsg" class="message success">✅ تم بنجاح!</div>
+  <div id="errorMsg" class="message error"></div>
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('children')">👶 الأطفال</button>
+    <button class="tab-btn" onclick="switchTab('booking')">📅 احجز موعد</button>
+    <button class="tab-btn" onclick="switchTab('status')">📍 حالة الدور</button>
+    <button class="tab-btn" onclick="switchTab('notifications')">🔔 التنبيهات</button>
+  </div>
+  <div id="childrenTab" class="tab-content active">
+    <div class="card">
+      <div class="card-header">👶 أطفالي</div>
+      <div id="childrenList"></div>
+    </div>
+  </div>
+  <div id="bookingTab" class="tab-content">
+    <div class="card">
+      <div class="card-header">📅 احجز موعد</div>
+      <div class="booking-step">
+        <div class="step-label"><span class="step-number">1</span> اختر الدكتور</div>
+        <div id="doctorsContainer"></div>
+      </div>
+      <div class="booking-step">
+        <div class="step-label"><span class="step-number">2</span> اختر اليوم والموعد</div>
+        <input type="date" id="bookingDate" class="date-input" onchange="onDateChange()">
+        <div class="slots-container" id="slotsContainer" style="display:none;">
+          <small style="color:var(--gray-500);">🟢 متاح • 🔴 محجوز</small>
+          <div class="cinema-slots" id="slotsGrid"></div>
+        </div>
+      </div>
+      <div class="booking-step">
+        <div class="step-label"><span class="step-number">3</span> تأكيد</div>
+        <div id="bookingSummary" style="display:none;">
+          <div class="summary-box">
+            <div class="summary-item">
+              <span>👨‍⚕️ الدكتور</span>
+              <span class="summary-value" id="summaryDoctor">-</span>
+            </div>
+            <div class="summary-item">
+              <span>📅 التاريخ</span>
+              <span class="summary-value" id="summaryDate">-</span>
+            </div>
+            <div class="summary-item">
+              <span>🕐 الموعد</span>
+              <span class="summary-value" id="summaryTime">-</span>
+            </div>
+            <div class="price-box">💰 100 جنيه</div>
+          </div>
+          <button class="btn btn-primary" onclick="proceedToPayment()">تأكيد والدفع</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="statusTab" class="tab-content">
+    <div class="card">
+      <div class="card-header">📍 حالة الدور</div>
+      <div id="statusList"></div>
+    </div>
+  </div>
+  <div id="notificationsTab" class="tab-content">
+    <div class="card">
+      <div class="card-header">🔔 التنبيهات</div>
+      <div id="notificationsList"></div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="paymentModal">
+  <div class="modal-content">
+    <div class="modal-header">💳 تأكيد الدفع</div>
+    <p style="color:var(--gray-500);margin-bottom:20px;">يرجى تحويل المبلغ إلى:</p>
+    <div class="payment-info">
+      <div class="payment-field">
+        <span>رقم Instapay:</span>
+        <span style="font-weight:700;color:var(--primary);font-size:16px;">201XXXXXXXX</span>
+      </div>
+      <div class="payment-field">
+        <span>المبلغ:</span>
+        <span style="font-weight:700;color:var(--accent);font-size:16px;">100 جنيه</span>
+      </div>
+    </div>
+    <button id="paymentBtn" class="btn btn-primary" onclick="showPaymentProofModal()">✅ تم التحويل - أدخل البيانات</button>
+    <button class="btn" style="background:var(--gray-200);color:var(--gray-700);margin-top:10px;" onclick="closePaymentModal()">❌ إلغاء</button>
+  </div>
+</div>
+<div class="modal" id="proofModal">
+  <div class="modal-content">
+    <div class="modal-header">💳 إتمام الدفع - أدخل بيانات التحويل</div>
+    <p style="color:var(--gray-500);margin-bottom:20px;">تأكد من إدخال بيانات صحيحة:</p>
+    <div class="form-group">
+      <label>رقم المرجع من البنك *</label>
+      <input type="text" id="refNumber" placeholder="مثال: TRX123456789" maxlength="50" required>
+      <small style="color:var(--gray-500);font-size:12px;">الرقم الذي تلقيته برسالة البنك</small>
+    </div>
+    <div class="form-group">
+      <label>صورة الإيصال البنكي *</label>
+      <input type="file" id="imgReceipt" accept="image/*" required>
+      <small style="color:var(--gray-500);font-size:12px;">JPG, PNG - أقل من 5MB</small>
+      <div id="imgPreview" style="margin-top:10px;text-align:center;"></div>
+    </div>
+    <div style="background:#fef3c7;padding:15px;border-radius:8px;margin:20px 0;">
+      <strong style="color:#92400e;">⚠️ تذكير:</strong>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#92400e;">الصورة يجب أن تظهر المبلغ والتاريخ بوضوح</p>
+    </div>
+    <button id="submitBtn" class="btn btn-primary" onclick="submitPaymentProof()">✅ تأكيد الدفع</button>
+    <button class="btn" style="background:var(--gray-200);color:var(--gray-700);margin-top:10px;" onclick="closeProofModal()">❌ إلغاء</button>
+  </div>
+</div>
+<script>
+const SUPABASE_URL='https://rsvpsnthgvqlfgcdboju.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzdnBzbnRoZ3ZxbGZnY2Rib2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTAyMzUsImV4cCI6MjA5OTA2NjIzNX0.p5beu5ifMjDUat6fytfRoD_Ab0X3fvD3pE0XG8dgKzQ';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let selectedDoctor=null,selectedDate=null,selectedTime=null;
+function switchTab(t){document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));document.getElementById(t+'Tab').classList.add('active');event.target.classList.add('active');if(t==='children')loadChildren();else if(t==='booking')loadDoctors();else if(t==='status')loadStatus();else if(t==='notifications')loadNotifications();}
+async function loadDoctors(){try{const{data}=await sb.from('doctors').select('id,name');const html=data.map(d=>`<div class="doctor-btn" onclick="selectDoctor('${d.id}','${d.name}')"><div class="doctor-name">👨‍⚕️ ${d.name}</div><div class="doctor-spec">متخصص في طب الأطفال</div></div>`).join('');document.getElementById('doctorsContainer').innerHTML=html;}catch(e){console.error(e);}}
+function selectDoctor(id,name){selectedDoctor={id,name};document.querySelectorAll('.doctor-btn').forEach(e=>e.classList.remove('selected'));event.target.closest('.doctor-btn').classList.add('selected');document.getElementById('bookingDate').value='';document.getElementById('slotsContainer').style.display='none';document.getElementById('bookingSummary').style.display='none';}
+async function onDateChange(){if(!selectedDoctor){showError('اختر الدكتور أولاً');return;}selectedDate=document.getElementById('bookingDate').value;if(selectedDate)await loadSlots();}
+async function loadSlots(){try{const d=new Date(selectedDate);const dw=d.getDay();const{data:s}=await sb.from('doctor_schedule').select('*').eq('doctor_id',selectedDoctor.id).eq('day_of_week',dw).eq('is_active',true).single();if(!s){showError('الدكتور غير متاح');document.getElementById('slotsContainer').style.display='none';return;}const{data:a}=await sb.from('appointments').select('scheduled_time').eq('doctor_id',selectedDoctor.id).gte('scheduled_time',selectedDate+'T00:00:00').lt('scheduled_time',selectedDate+'T23:59:59');const booked=new Set((a||[]).map(x=>x.scheduled_time.substring(11,16)));const slots=[];const[sh,sm]=s.start_time.split(':').map(Number);const[eh,em]=s.end_time.split(':').map(Number);const dur=s.slot_duration_minutes;let ct=sh*60+sm;const et=eh*60+em;while(ct<et){const h=Math.floor(ct/60),m=ct%60,ts=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;slots.push({time:ts,booked:booked.has(ts)});ct+=dur;}renderSlots(slots);document.getElementById('slotsContainer').style.display='block';}catch(e){showError('خطأ: '+e.message);}}
+function renderSlots(slots){const html=slots.map(s=>`<div class="cinema-slot ${s.booked?'booked':'available'}" ${!s.booked?`onclick="selectSlot('${s.time}')"`:''}>${s.time}</div>`).join('');document.getElementById('slotsGrid').innerHTML=html;}
+function selectSlot(time){selectedTime=time;document.querySelectorAll('.cinema-slot.available').forEach(e=>e.classList.remove('selected'));event.target.classList.add('selected');updateSummary();}
+function updateSummary(){if(!selectedDoctor||!selectedDate||!selectedTime){document.getElementById('bookingSummary').style.display='none';return;}const dt=new Date(selectedDate).toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'});document.getElementById('summaryDoctor').textContent=selectedDoctor.name;document.getElementById('summaryDate').textContent=dt;document.getElementById('summaryTime').textContent=selectedTime;document.getElementById('bookingSummary').style.display='block';}
+function proceedToPayment(){document.getElementById('paymentModal').classList.add('show');}
+function showPaymentProofModal(){document.getElementById('proofModal').classList.add('show');}
+function closeProofModal(){document.getElementById('proofModal').classList.remove('show');document.getElementById('refNumber').value='';document.getElementById('imgReceipt').value='';document.getElementById('imgPreview').innerHTML='';}
+function closePaymentModal(){document.getElementById('paymentModal').classList.remove('show');}
+document.getElementById('imgReceipt').addEventListener('change',function(e){const f=e.target.files[0];if(f){const r=new FileReader();r.onload=function(ev){document.getElementById('imgPreview').innerHTML='<img src="'+ev.target.result+'" style="max-width:200px;border-radius:8px;border:1px solid var(--gray-300);">';};r.readAsDataURL(f);}});
+async function submitPaymentProof(){const ref=document.getElementById('refNumber').value;const img=document.getElementById('imgReceipt').files[0];if(!ref||!img){showError('أدخل الرقم والصورة');return;}if(img.size>5*1024*1024){showError('الصورة كبيرة جداً (حد أقصى 5MB)');return;}const btn=document.getElementById('submitBtn');btn.disabled=true;btn.textContent='جاري الرفع...';try{const{data:{user}}=await sb.auth.getUser();if(!user){showError('تسجيل دخول مطلوب');throw new Error('no_auth');}const at=selectedDate+'T'+selectedTime+':00';const{data:apt}=await sb.from('appointments').insert({guardian_id:user.id,doctor_id:selectedDoctor.id,location_id:'d62a1e3a-7f4e-4b7f-a9e8-9c5d2b1a3e4f',visit_type:'in_person',scheduled_time:at,status:'booked'}).select().single();if(!apt)throw new Error('فشل الحجز');const fname='receipt_'+apt.id+'_'+Date.now()+'.'+img.name.split('.').pop();const{error:upe}=await sb.storage.from('receipts').upload(fname,img);if(upe)throw new Error('فشل رفع الصورة');const{data:url}=sb.storage.from('receipts').getPublicUrl(fname);await sb.from('payments').insert({appointment_id:apt.id,visit_type:'in_person',amount_due:100,amount_paid:0,payment_status:'pending',verification_status:'pending',reference_number:ref,receipt_image_url:url.publicUrl});await sb.from('notifications').insert({guardian_id:user.id,appointment_id:apt.id,message:'✅ تم استقبال الحجز والدفع. في انتظار تأكيد السكرتيرة',type:'booking_confirmation',read:false});showSuccess('✅ تم الحجز! السكرتيرة ستتحقق من الدفع');closePaymentModal();closeProofModal();setTimeout(()=>location.href='index.html',2000);}catch(e){btn.disabled=false;btn.textContent='✅ تأكيد الدفع';showError(e.message==='no_auth'?'تسجيل دخول مطلوب':'خطأ: '+e.message);}}
+async function loadChildren(){try{const{data}=await sb.from('children').select('*').limit(5);const html=(data&&data.length>0)?data.map(c=>`<div style="padding:15px;background:var(--gray-50);border-radius:10px;margin-bottom:10px;"><strong>${c.name}</strong><br><small style="color:var(--gray-500);">العمر: ${c.age} سنوات</small></div>`).join(''):'<p style="color:var(--gray-500);">لا توجد بيانات</p>';document.getElementById('childrenList').innerHTML=html;}catch(e){}}
+async function loadStatus(){try{const{data}=await sb.from('appointments').select('*').eq('status','confirmed').limit(5);const html=(data&&data.length>0)?data.map(a=>`<div style="padding:15px;background:var(--gray-50);border-radius:10px;margin-bottom:10px;"><strong>⏰ ${a.scheduled_time.substring(11,16)}</strong><br><small>✅ جاهز</small></div>`).join(''):'<p style="color:var(--gray-500);">لا توجد حجوزات مؤكدة</p>';document.getElementById('statusList').innerHTML=html;}catch(e){}}
+async function loadNotifications(){try{const{data}=await sb.from('notifications').select('*').limit(10);const html=(data&&data.length>0)?data.map(n=>`<div style="padding:15px;background:var(--gray-50);border-radius:10px;margin-bottom:10px;"><small style="color:var(--gray-500);">${new Date(n.created_at).toLocaleString('ar-EG')}</small><br>${n.message}</div>`).join(''):'<p style="color:var(--gray-500);">لا توجد تنبيهات</p>';document.getElementById('notificationsList').innerHTML=html;}catch(e){}}
+function showError(m){const e=document.getElementById('errorMsg');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+function showSuccess(m){const e=document.getElementById('successMsg');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+async function logout(){await sb.auth.signOut();window.location.href='index.html';}
+document.addEventListener('DOMContentLoaded',()=>{loadChildren();});
+</script>
+</body>
+</html>

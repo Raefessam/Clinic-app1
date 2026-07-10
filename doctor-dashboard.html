@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الدكتور | عيادتي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --primary: #0e6e63;
+  --primary-dark: #0a4f47;
+  --accent: #e8a33d;
+  --success: #22c55e;
+  --danger: #c1483a;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --radius: 12px;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Cairo',sans-serif;background:linear-gradient(135deg,#f0fdfb 0%,#f9fafb 100%);color:var(--gray-700);}
+.header{background:white;padding:20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);position:sticky;top:0;z-index:100;}
+.header h1{margin:0;color:var(--primary);font-size:24px;}
+.container{max-width:1400px;margin:0 auto;padding:30px 20px;}
+.tabs-nav{display:flex;gap:10px;margin-bottom:30px;border-bottom:2px solid var(--gray-200);flex-wrap:wrap;}
+.tab-btn{padding:12px 20px;border:none;background:none;color:var(--gray-500);font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.3s;}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.card{background:white;border-radius:var(--radius);padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;}
+.card-header{font-size:18px;font-weight:700;color:var(--primary);margin-bottom:20px;padding-bottom:15px;border-bottom:2px solid var(--accent);}
+.cinema-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:12px;margin:20px 0;}
+.cinema-slot{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:2px solid var(--gray-300);border-radius:10px;cursor:pointer;transition:all 0.3s;font-weight:600;font-size:13px;background:white;}
+.cinema-slot.available{border-color:var(--success);background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%);color:var(--success);}
+.cinema-slot.available:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(34,197,94,0.2);}
+.cinema-slot.booked{border-color:var(--gray-300);background:var(--gray-100);color:var(--gray-400);cursor:not-allowed;opacity:0.6;}
+.schedule-day{background:var(--gray-50);border:2px solid var(--gray-200);border-radius:10px;padding:20px;margin-bottom:15px;transition:all 0.3s;}
+.schedule-day:hover{border-color:var(--primary);box-shadow:0 4px 12px rgba(14,110,99,0.15);}
+.day-name{font-weight:700;font-size:16px;color:var(--primary);margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;}
+.toggle-switch{position:relative;width:50px;height:26px;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--gray-300);transition:0.3s;border-radius:26px;}
+.slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background-color:white;transition:0.3s;border-radius:50%;}
+input:checked+.slider{background-color:var(--success);}
+input:checked+.slider:before{transform:translateX(24px);}
+.time-inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-bottom:15px;}
+.form-group{display:flex;flex-direction:column;gap:8px;}
+.form-group label{font-weight:600;font-size:13px;color:var(--gray-700);}
+.form-group input,.form-group select{padding:10px;border:1px solid var(--gray-300);border-radius:8px;font-family:'Cairo',sans-serif;font-size:14px;}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,110,99,0.1);}
+.btn{padding:10px 20px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.3s;font-size:14px;}
+.btn:hover{background:var(--primary-dark);transform:translateY(-2px);}
+.btn-danger{background:var(--danger);}
+.btn-danger:hover{background:#a03535;}
+table{width:100%;border-collapse:collapse;margin-top:20px;}
+thead{background:var(--primary);color:white;}
+th{padding:15px;text-align:right;font-weight:700;}
+td{padding:15px;border-bottom:1px solid var(--gray-200);}
+tbody tr:hover{background:var(--gray-50);}
+.badge{display:inline-block;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;background:#dbeafe;color:#0c4a6e;}
+.exception-item{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#fef08a;border-radius:8px;margin-bottom:10px;}
+.exception-date{font-weight:700;color:var(--primary);}
+.message{padding:15px;border-radius:8px;margin-bottom:15px;display:none;}
+.message.show{display:block;}
+.message.success{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;}
+.message.error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+@media(max-width:768px){.time-inputs{grid-template-columns:1fr;}.cinema-grid{grid-template-columns:repeat(auto-fill,minmax(60px,1fr));}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>👨‍⚕️ لوحة الدكتور</h1>
+  <div>
+    <span id="doctorName" style="margin-right:20px;font-weight:600;">د. شيماء</span>
+    <button class="btn btn-danger" onclick="logout()">تسجيل خروج</button>
+  </div>
+</div>
+<div class="container">
+  <div id="successMsg" class="message success">✅ تم الحفظ بنجاح!</div>
+  <div id="errorMsg" class="message error"></div>
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('appointments')">📅 حجوزات اليوم</button>
+    <button class="tab-btn" onclick="switchTab('schedule')">🗓️ جدول العمل</button>
+    <button class="tab-btn" onclick="switchTab('exceptions')">🎄 الإجازات</button>
+  </div>
+  <div id="appointmentsTab" class="tab-content active">
+    <div class="card">
+      <div class="card-header">📅 حجوزات اليوم</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>الوقت</th><th>الطفل</th><th>ولي الأمر</th><th>الحالة</th><th>الدفع</th></tr></thead>
+          <tbody id="appointmentsBody"><tr><td colspan="5" style="text-align:center;color:var(--gray-500);padding:30px;">جاري التحميل...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">🎬 عرض مرئي للحجوزات</div>
+      <small style="color:var(--gray-500);">🟢 متاح • ⚪ محجوز</small>
+      <div class="cinema-grid" id="cinemaGrid"></div>
+    </div>
+  </div>
+  <div id="scheduleTab" class="tab-content">
+    <div class="card">
+      <div class="card-header">🗓️ جدول العمل</div>
+      <div id="scheduleContainer"></div>
+    </div>
+  </div>
+  <div id="exceptionsTab" class="tab-content">
+    <div class="card">
+      <div class="card-header">🎄 الإجازات</div>
+      <div style="background:var(--gray-50);padding:20px;border-radius:10px;margin-bottom:20px;">
+        <div class="time-inputs">
+          <div class="form-group"><label>التاريخ</label><input type="date" id="exceptionDate"></div>
+          <div class="form-group"><label>السبب</label><input type="text" id="exceptionReason" placeholder="إجازة..."></div>
+          <div class="form-group"><label>&nbsp;</label><button class="btn" onclick="addException()">➕ إضافة</button></div>
+        </div>
+      </div>
+      <div id="exceptionsList"></div>
+    </div>
+  </div>
+</div>
+<script>
+const SUPABASE_URL='https://rsvpsnthgvqlfgcdboju.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzdnBzbnRoZ3ZxbGZnY2Rib2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTAyMzUsImV4cCI6MjA5OTA2NjIzNX0.p5beu5ifMjDUat6fytfRoD_Ab0X3fvD3pE0XG8dgKzQ';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const DOCTOR_ID='23fd70cf-ff05-49e7-906a-cf37eb647a62';
+const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function switchTab(t){document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));document.getElementById(t+'Tab').classList.add('active');event.target.classList.add('active');if(t==='appointments')loadAppointments();else if(t==='schedule')loadSchedule();else if(t==='exceptions')loadExceptions();}
+async function loadAppointments(){try{const today=new Date().toISOString().split('T')[0];const{data}=await sb.from('appointments').select(`id,scheduled_time,status,children(name),payments(verification_status)`).gte('scheduled_time',today+'T00:00:00').lt('scheduled_time',today+'T23:59:59').order('scheduled_time');const html=(data&&data.length>0)?data.map(a=>`<tr><td>${new Date(a.scheduled_time).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})}</td><td>${a.children?.name||'-'}</td><td>أحمد</td><td><span class="badge">${a.status}</span></td><td>${a.payments?.[0]?.verification_status==='verified'?'✅':'⏳'}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-500);">لا توجد حجوزات</td></tr>';document.getElementById('appointmentsBody').innerHTML=html;renderCinemaGrid(data||[]);}catch(e){console.error(e);}}
+function renderCinemaGrid(a){const slots=[];const b=new Set(a.map(x=>x.scheduled_time.substring(11,16)));for(let h=10;h<14;h++)for(let m=0;m<60;m+=20){const t=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;slots.push(`<div class="cinema-slot ${b.has(t)?'booked':'available'}">${t}</div>`);}document.getElementById('cinemaGrid').innerHTML=slots.join('');}
+async function loadSchedule(){try{const{data:s}=await sb.from('doctor_schedule').select('*').eq('doctor_id',DOCTOR_ID).order('day_of_week');let h='';for(let d=0;d<7;d++){const sc=s?.find(x=>x.day_of_week===d);h+=`<div class="schedule-day"><div class="day-name"><span>${DAYS[d]}</span><label class="toggle-switch"><input type="checkbox" ${sc?.is_active?'checked':''} onchange="toggleDay(${d},this.checked)"><span class="slider"></span></label></div><div class="time-inputs"><div class="form-group"><label>من</label><input type="time" class="start-${d}" value="${sc?.start_time||'10:00'}"></div><div class="form-group"><label>إلى</label><input type="time" class="end-${d}" value="${sc?.end_time||'14:00'}"></div><div class="form-group"><label>مدة</label><select class="dur-${d}"><option value="20" ${sc?.slot_duration_minutes===20?'selected':''}>20</option><option value="30" ${sc?.slot_duration_minutes===30?'selected':''}>30</option></select></div></div><button class="btn" onclick="saveDay(${d})">💾 حفظ</button></div>`;}document.getElementById('scheduleContainer').innerHTML=h;}catch(e){showError('خطأ: '+e.message);}}
+async function saveDay(d){const st=document.querySelector(`.start-${d}`).value;const et=document.querySelector(`.end-${d}`).value;const dur=document.querySelector(`.dur-${d}`).value;if(!st||!et){showError('أدخل الأوقات');return;}try{const{data:e}=await sb.from('doctor_schedule').select('id').eq('doctor_id',DOCTOR_ID).eq('day_of_week',d).single();if(e){await sb.from('doctor_schedule').update({start_time:st,end_time:et,slot_duration_minutes:parseInt(dur)}).eq('id',e.id);}else{await sb.from('doctor_schedule').insert({doctor_id:DOCTOR_ID,day_of_week:d,start_time:st,end_time:et,slot_duration_minutes:parseInt(dur),is_active:true});}showSuccess('✅ تم!');setTimeout(()=>loadSchedule(),1000);}catch(e){showError('خطأ: '+e.message);}}
+async function toggleDay(d,a){try{const{data:e}=await sb.from('doctor_schedule').select('id').eq('doctor_id',DOCTOR_ID).eq('day_of_week',d).single();if(e){await sb.from('doctor_schedule').update({is_active:a}).eq('id',e.id);showSuccess('✅ تم!');setTimeout(()=>loadSchedule(),500);}}catch(e){}}
+async function addException(){const d=document.getElementById('exceptionDate').value;const r=document.getElementById('exceptionReason').value;if(!d||!r){showError('أدخل البيانات');return;}try{await sb.from('schedule_exceptions').insert({doctor_id:DOCTOR_ID,date:d,reason:r,exception_type:'holiday'});showSuccess('✅ تم!');document.getElementById('exceptionDate').value='';document.getElementById('exceptionReason').value='';setTimeout(()=>loadExceptions(),1000);}catch(e){showError('خطأ: '+e.message);}}
+async function loadExceptions(){try{const{data:e}=await sb.from('schedule_exceptions').select('*').eq('doctor_id',DOCTOR_ID).order('date',{ascending:false});const h=(e&&e.length>0)?e.map(x=>`<div class="exception-item"><div><div class="exception-date">${new Date(x.date).toLocaleDateString('ar-EG')}</div><small>${x.reason}</small></div><button class="btn btn-danger" onclick="deleteException('${x.id}')">حذف</button></div>`).join(''):'<p style="text-align:center;color:var(--gray-500);">لا توجد إجازات</p>';document.getElementById('exceptionsList').innerHTML=h;}catch(e){}}
+async function deleteException(id){if(!confirm('تأكيد الحذف؟'))return;try{await sb.from('schedule_exceptions').delete().eq('id',id);showSuccess('✅ تم!');setTimeout(()=>loadExceptions(),1000);}catch(e){}}
+function showSuccess(m){const e=document.getElementById('successMsg');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+function showError(m){const e=document.getElementById('errorMsg');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+async function logout(){await sb.auth.signOut();window.location.href='index.html';}
+document.addEventListener('DOMContentLoaded',()=>{loadAppointments();sb.channel('d').on('postgres_changes',{event:'*',schema:'public',table:'appointments'},()=>loadAppointments()).subscribe();});
+</script>
+</body>
+</html>
